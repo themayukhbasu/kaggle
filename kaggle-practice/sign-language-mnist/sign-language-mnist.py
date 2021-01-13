@@ -26,8 +26,9 @@ test_x, test_y = get_data('data/sign_mnist_test.csv')
 
 train_x = np.expand_dims(train_x, axis=-1)
 test_x = np.expand_dims(test_x, axis=-1)
-print(train_x.shape)
 
+
+batch_size =32
 train_datagen = tf.keras.preprocessing.image.ImageDataGenerator(
     rescale= 1./255.0,
     horizontal_flip=True,
@@ -39,6 +40,16 @@ train_datagen = tf.keras.preprocessing.image.ImageDataGenerator(
 test_datagen = tf.keras.preprocessing.image.ImageDataGenerator(
     rescale=1./255.0
 )
+train_data_generator = train_datagen.flow(train_x, train_y, subset='training')
+val_data_generator = train_datagen.flow(train_x, train_y, batch_size=batch_size, subset='validation')
+test_data_generator = test_datagen.flow(test_x, test_y, batch_size=batch_size)
+
+class myEarlyStopCallback(tf.keras.callbacks.Callback):
+    def on_epoch_end(self, epoch, logs={}):
+        if logs.get('accuracy')>0.98:
+            print("Model has reached desired training accuracy")
+            self.model.stop_training=True
+
 def simple_feed_forward(train_datagen, test_datagen, train_x, train_y, test_x, test_y):
 
     model = tf.keras.models.Sequential([
@@ -62,7 +73,7 @@ def simple_feed_forward(train_datagen, test_datagen, train_x, train_y, test_x, t
 
     print("Validation Loss: ",loss, ' and accuracy: ', acc)
 
-def using_cnn(train_datagen, test_datagen, train_x, train_y, test_x, test_y):
+def using_cnn(train_data_generator, val_data_generator, test_data_generator):
     model = tf.keras.models.Sequential([
         tf.keras.layers.Conv2D(32, (3,3), activation='relu', input_shape=[28, 28, 1]),
         tf.keras.layers.Conv2D(32,3, activation='relu'),
@@ -75,10 +86,13 @@ def using_cnn(train_datagen, test_datagen, train_x, train_y, test_x, test_y):
     model.compile(loss=tf.keras.losses.SparseCategoricalCrossentropy(),
                   optimizer='adam',
                   metrics='accuracy')
-    model.fit(train_datagen.flow(train_x, train_y, batch_size=32, subset='training'),
-              validation_data=train_datagen.flow(train_x, train_y, batch_size=32, subset='validation'),
-              epochs=10)
-    loss, acc = model.evaluate(test_datagen.flow(test_x, test_y, batch_size=32))
+    my_early_stopping_cb = myEarlyStopCallback()
+
+    model.fit(train_data_generator,
+              validation_data=val_data_generator,
+              epochs=10,
+              callbacks=[my_early_stopping_cb])
+    loss, acc = model.evaluate(test_data_generator)
     print("Test loss is %f and accuracy is %f" % (loss, acc))
 
 

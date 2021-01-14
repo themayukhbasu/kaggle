@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 
 print(tf.__version__)
+print()
 
 def test1():
     df_train_data = pd.read_csv('data/sign_mnist_train.csv')
